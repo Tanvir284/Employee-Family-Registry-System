@@ -1,122 +1,106 @@
-import React from 'react';
-import { Layout, Menu, Button, Typography, Avatar, Space, Divider } from 'antd';
+import React, { useState } from 'react';
+import { Layout, Menu, Button, Typography, Avatar, Space, Divider, Grid } from 'antd';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { 
-  UserOutlined, 
-  TeamOutlined, 
-  LogoutOutlined, 
-  DashboardOutlined, 
-  SettingOutlined,
-  BellOutlined
+import { useAuth } from '../contexts/useAuth';
+import {
+  UserOutlined,
+  TeamOutlined,
+  LogoutOutlined,
+  DashboardOutlined,
+  BulbOutlined,
+  BellOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from '@ant-design/icons';
 
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
-const MainLayout = () => {
+const MainLayout = ({ isDarkMode, toggleTheme }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const screens = useBreakpoint();
+  const [collapsed, setCollapsed] = useState(false);
 
   const menuItems = [
     {
       key: '/',
       icon: <DashboardOutlined />,
-      label: <Link to="/">Dashboard</Link>,
+      label: <Link to="/">Overview</Link>,
     },
     {
       key: '/employees',
       icon: <TeamOutlined />,
-      label: <Link to="/">Employee List</Link>,
+      label: <Link to="/">Employee Directory</Link>,
     },
-    {
-      type: 'divider',
-    },
-    {
-      key: '/settings',
-      icon: <SettingOutlined />,
-      label: 'Settings',
-      disabled: true
-    }
   ];
 
+  const isMobile = !screens.lg;
+
   return (
-    <Layout style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      <Sider 
-        breakpoint="lg" 
-        collapsedWidth="0"
-        width={260}
-        style={{ 
-          background: '#0f172a',
-          position: 'fixed',
-          height: '100vh',
-          left: 0,
-          zIndex: 100
-        }}
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        onCollapse={setCollapsed}
+        trigger={null}
+        breakpoint="lg"
+        collapsedWidth={isMobile ? 0 : 80}
+        width={240}
       >
-        <div style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ 
-            display: 'inline-flex', 
-            padding: '8px', 
-            background: 'rgba(99, 102, 241, 0.1)', 
-            borderRadius: '12px',
-            marginBottom: '12px'
-          }}>
-            <TeamOutlined style={{ fontSize: '24px', color: '#6366f1' }} />
-          </div>
+        <div style={{ padding: collapsed ? '20px 10px' : '24px 16px', textAlign: 'center' }}>
           <Title level={4} style={{ color: 'white', margin: 0, fontFamily: "'Outfit', sans-serif" }}>
-            Registry Pro
+            {collapsed ? 'ER' : 'Registry Pro'}
           </Title>
-          <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px' }}>Enterprise Management</Text>
+          {!collapsed && (
+            <Text style={{ color: 'rgba(255,255,255,.6)', fontSize: 12 }}>
+              Workforce Operations
+            </Text>
+          )}
         </div>
-        <Divider style={{ borderColor: 'rgba(255, 255, 255, 0.1)', margin: '0 24px 24px' }} />
-        <Menu 
-          theme="dark" 
-          mode="inline" 
-          selectedKeys={[location.pathname]} 
-          items={menuItems} 
-          style={{ padding: '0 12px' }}
-        />
+        <Divider style={{ borderColor: 'rgba(255, 255, 255, 0.1)', margin: '0 12px 20px' }} />
+        <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={menuItems} />
       </Sider>
-      
-      <Layout style={{ marginLeft: 260 }}>
-        <Header style={{ 
-          background: 'rgba(255, 255, 255, 0.8)', 
-          backdropFilter: 'blur(8px)',
-          padding: '0 32px', 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+
+      <Layout>
+        <Header style={{
+          padding: '0 16px 0 12px',
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
+          borderBottom: isDarkMode ? '1px solid #262626' : '1px solid #e2e8f0',
           position: 'sticky',
           top: 0,
-          zIndex: 99,
-          borderBottom: '1px solid #e2e8f0',
-          height: '72px'
+          zIndex: 20,
         }}>
-          <Title level={5} style={{ margin: 0, color: '#64748b' }}>
-            {location.pathname === '/' ? 'Employee Overview' : 'Management'}
-          </Title>
-          
-          <Space size="large">
-            <Button type="text" icon={<BellOutlined style={{ fontSize: '18px', color: '#64748b' }} />} />
+          <Space>
+            <Button
+              type="text"
+              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              onClick={() => setCollapsed(!collapsed)}
+            />
+            <Title level={5} style={{ margin: 0 }}>{location.pathname === '/' ? 'People Analytics' : 'Employee'}</Title>
+          </Space>
+
+          <Space size="middle">
+            <Button icon={<BulbOutlined />} onClick={toggleTheme}>
+              {isDarkMode ? 'Light' : 'Dark'}
+            </Button>
+            <Button type="text" icon={<BellOutlined />} />
             <Divider type="vertical" />
             <Space>
               <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
-                <Text strong style={{ fontSize: '14px', lineHeight: '1.2' }}>{user?.username}</Text>
-                <Text type="secondary" style={{ fontSize: '12px' }}>{user?.role}</Text>
+                <Text strong style={{ lineHeight: 1.2 }}>{user?.username}</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>{user?.role}</Text>
               </div>
               <Avatar icon={<UserOutlined />} style={{ background: '#6366f1' }} />
-              <Button 
-                icon={<LogoutOutlined />} 
-                onClick={logout} 
-                type="text" 
-                danger
-              />
+              <Button icon={<LogoutOutlined />} onClick={logout} type="text" danger />
             </Space>
           </Space>
         </Header>
-        
-        <Content style={{ margin: '24px 32px', minHeight: 280 }}>
+
+        <Content style={{ margin: isMobile ? 12 : 24, minHeight: 280 }}>
           <Outlet />
         </Content>
       </Layout>

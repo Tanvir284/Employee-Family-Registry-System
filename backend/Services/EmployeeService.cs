@@ -7,6 +7,8 @@ namespace EmployeeRegistry.Services
     public interface IEmployeeService
     {
         Task<IEnumerable<EmployeeDto>> GetAllEmployeesAsync(string? search);
+        Task<PagedResultDto<EmployeeDto>> GetEmployeesAsync(EmployeeQueryDto query);
+        Task<EmployeeSummaryDto> GetSummaryAsync();
         Task<EmployeeDto?> GetEmployeeByIdAsync(int id);
         Task<EmployeeDto> CreateEmployeeAsync(CreateEmployeeDto createDto);
         Task<bool> UpdateEmployeeAsync(int id, CreateEmployeeDto updateDto);
@@ -26,6 +28,25 @@ namespace EmployeeRegistry.Services
         {
             var employees = await _repository.GetAllAsync(search);
             return employees.Select(MapToDto);
+        }
+
+        public async Task<PagedResultDto<EmployeeDto>> GetEmployeesAsync(EmployeeQueryDto query)
+        {
+            var pagedResult = await _repository.GetPagedAsync(query);
+
+            return new PagedResultDto<EmployeeDto>
+            {
+                Items = pagedResult.Items.Select(MapToDto).ToList(),
+                Page = pagedResult.Page,
+                PageSize = pagedResult.PageSize,
+                TotalItems = pagedResult.TotalItems,
+                TotalPages = pagedResult.TotalPages
+            };
+        }
+
+        public async Task<EmployeeSummaryDto> GetSummaryAsync()
+        {
+            return await _repository.GetSummaryAsync();
         }
 
         public async Task<EmployeeDto?> GetEmployeeByIdAsync(int id)
@@ -80,7 +101,6 @@ namespace EmployeeRegistry.Services
             employee.Department = updateDto.Department;
             employee.BasicSalary = updateDto.BasicSalary;
 
-            // Update Spouse
             if (updateDto.Spouse == null)
             {
                 employee.Spouse = null;
@@ -92,7 +112,6 @@ namespace EmployeeRegistry.Services
                 employee.Spouse.NID = updateDto.Spouse.NID;
             }
 
-            // Update Children (Simple approach: clear and re-add)
             employee.Children.Clear();
             foreach (var childDto in updateDto.Children)
             {
