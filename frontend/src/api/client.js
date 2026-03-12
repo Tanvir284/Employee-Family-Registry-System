@@ -1,6 +1,25 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5140/api';
+const inferApiBaseUrl = () => {
+  const configuredApiUrl = import.meta.env.VITE_API_URL;
+  if (configuredApiUrl) return configuredApiUrl;
+
+  const { protocol, hostname, origin } = window.location;
+
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:5140/api';
+  }
+
+  // Helpful fallback for default Render service names used in this repository.
+  if (hostname.endsWith('.onrender.com')) {
+    return `${protocol}//employee-registry-api.onrender.com/api`;
+  }
+
+  // Generic fallback when frontend and backend are served behind same host/reverse-proxy.
+  return `${origin}/api`;
+};
+
+const API_BASE_URL = inferApiBaseUrl();
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -22,7 +41,11 @@ client.interceptors.request.use(
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
+    const status = error?.response?.status;
+    const requestUrl = error?.config?.url ?? '';
+    const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+
+    if (status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

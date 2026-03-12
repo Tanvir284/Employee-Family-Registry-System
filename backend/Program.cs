@@ -59,24 +59,39 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact", policy =>
     {
-        var origins = builder.Configuration["AllowedOrigins"];
-        if (origins == "*")
+        var rawAllowedOrigins = builder.Configuration["AllowedOrigins"];
+
+        if (string.Equals(rawAllowedOrigins?.Trim(), "*", StringComparison.Ordinal))
         {
             policy.AllowAnyOrigin()
                 .AllowAnyMethod()
                 .AllowAnyHeader()
                 .WithExposedHeaders("Content-Disposition");
+            return;
         }
-        else
+
+        var configuredArray = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>();
+
+        var parsedFromString = (rawAllowedOrigins ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(origin => !string.IsNullOrWhiteSpace(origin))
+            .ToArray();
+
+        var allowedOrigins = (configuredArray != null && configuredArray.Length > 0
+                ? configuredArray
+                : parsedFromString)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (allowedOrigins.Length == 0)
         {
-            var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? 
-                new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://127.0.0.1:5173" };
-                
-            policy.WithOrigins(allowedOrigins)
-                .AllowAnyMethod()
-                .AllowAnyHeader()
-                .WithExposedHeaders("Content-Disposition");
+            allowedOrigins = new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://127.0.0.1:5173" };
         }
+
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .WithExposedHeaders("Content-Disposition");
     });
 });
 
