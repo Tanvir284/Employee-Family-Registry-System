@@ -15,7 +15,7 @@ import {
   WalletOutlined
 } from '@ant-design/icons';
 import client from '../api/client';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
