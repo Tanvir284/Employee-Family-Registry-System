@@ -27,8 +27,17 @@ const RegisterPage = () => {
       message.success('Registration successful! Please sign in.');
       navigate('/login');
     } catch (error) {
-      console.error(error);
-      const errorMsg = error.response?.data?.message || 'Registration failed. Please try again.';
+      console.error('Registration Error:', error);
+      let errorMsg = 'Registration failed. Please try again.';
+      
+      if (error.response) {
+        // Server responded with a status code
+        errorMsg = error.response.data?.message || `Error ${error.response.status}: Failed to register.`;
+      } else if (error.request) {
+        // Request was made but no response received (CORS or Network issue)
+        errorMsg = 'Cannot reach the server. This may be a CORS issue or network problem.';
+      }
+      
       message.error(errorMsg);
     } finally {
       setLoading(false);
