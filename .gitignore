@@ -1,0 +1,40 @@
+# .gitignore for Employee & Family Registry System
+
+# .NET
+bin/
+obj/
+[Ee]bug/
+[Rr]elease/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# PostgreSQL Local Data
+pgdata/
+pgpass.txt
+*.log
+
+# Environment/Secrets
+appsettings.Development.json
+.env
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.sln.docstates
+*.userosscache
