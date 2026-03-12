@@ -57,9 +57,12 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 // CORS
 builder.Services.AddCors(options =>
 {
+    var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? 
+        new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://127.0.0.1:5173" };
+
     options.AddPolicy("AllowReact", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://127.0.0.1:5173")
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyMethod()
             .AllowAnyHeader()
             .WithExposedHeaders("Content-Disposition");
@@ -106,4 +109,13 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.Run();
+// Handle Render/Cloud Port
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
+{
+    app.Run($"http://0.0.0.0:{port}");
+}
+else
+{
+    app.Run();
+}

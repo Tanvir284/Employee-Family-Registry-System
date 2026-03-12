@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Card, Typography, message } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, UserAddOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import client from '../api/client';
 
 const { Title, Text } = Typography;
 
@@ -19,7 +19,7 @@ const RegisterPage = () => {
 
     setLoading(true);
     try {
-      await axios.post('http://localhost:5140/api/auth/register', {
+      await client.post('/auth/register', {
         username: values.username,
         email: values.email,
         password: values.password
