@@ -26,7 +26,19 @@ namespace EmployeeRegistry.Services
 
         public async Task<AuthResponseDto?> LoginAsync(LoginDto loginDto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == loginDto.Username);
+            var identifier = loginDto.Username?.Trim();
+            if (string.IsNullOrWhiteSpace(identifier) || string.IsNullOrWhiteSpace(loginDto.Password))
+            {
+                return null;
+            }
+
+            var normalizedIdentifier = identifier.ToLower();
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u =>
+                    u.Username.ToLower() == normalizedIdentifier ||
+                    u.Email.ToLower() == normalizedIdentifier);
+
             if (user == null || !BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash))
             {
                 return null;
@@ -47,22 +59,30 @@ namespace EmployeeRegistry.Services
 
         public async Task<bool> RegisterAsync(RegisterDto registerDto)
         {
-            // Gmail validation
-            if (!registerDto.Email.ToLower().EndsWith("@gmail.com"))
+            var username = registerDto.Username?.Trim();
+            var email = registerDto.Email?.Trim().ToLower();
+
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(registerDto.Password))
             {
                 return false;
             }
 
-            // Uniqueness check
-            if (await _context.Users.AnyAsync(u => u.Username == registerDto.Username || u.Email == registerDto.Email))
+            // Gmail validation
+            if (!email.EndsWith("@gmail.com"))
+            {
+                return false;
+            }
+
+            // Uniqueness check (case-insensitive)
+            if (await _context.Users.AnyAsync(u => u.Username.ToLower() == username.ToLower() || u.Email.ToLower() == email))
             {
                 return false;
             }
 
             var user = new User
             {
-                Username = registerDto.Username,
-                Email = registerDto.Email,
+                Username = username,
+                Email = email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password),
                 Role = "Viewer" // Default role
             };
