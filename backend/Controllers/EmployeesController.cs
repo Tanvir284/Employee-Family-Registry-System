@@ -18,10 +18,25 @@ namespace EmployeeRegistry.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<EmployeeDto>>> GetAll([FromQuery] string? search)
+        public async Task<ActionResult<PagedResultDto<EmployeeDto>>> GetAll([FromQuery] EmployeeQueryDto query)
         {
-            var employees = await _employeeService.GetAllEmployeesAsync(search);
+            var employees = await _employeeService.GetEmployeesAsync(query);
             return Ok(employees);
+        }
+
+        [HttpGet("summary")]
+        public async Task<ActionResult<EmployeeSummaryDto>> GetSummary()
+        {
+            var summary = await _employeeService.GetSummaryAsync();
+            return Ok(summary);
+        }
+
+
+        [HttpGet("dashboard")]
+        public async Task<ActionResult<EmployeeDashboardDto>> GetDashboard()
+        {
+            var dashboard = await _employeeService.GetDashboardAsync();
+            return Ok(dashboard);
         }
 
         [HttpGet("{id}")]
