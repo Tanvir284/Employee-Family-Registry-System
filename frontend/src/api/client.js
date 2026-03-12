@@ -1,15 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL_STORAGE_KEY = 'apiBaseUrlOverride';
-
-const getStoredApiBaseUrl = () => localStorage.getItem(API_BASE_URL_STORAGE_KEY)?.trim();
-
 const inferApiBaseUrl = () => {
-  const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
+  const configuredApiUrl = import.meta.env.VITE_API_URL;
   if (configuredApiUrl) return configuredApiUrl;
-
-  const storedApiUrl = getStoredApiBaseUrl();
-  if (storedApiUrl) return storedApiUrl;
 
   const { protocol, hostname, origin } = window.location;
 
@@ -17,39 +10,16 @@ const inferApiBaseUrl = () => {
     return 'http://localhost:5140/api';
   }
 
+  // Helpful fallback for default Render service names used in this repository.
   if (hostname.endsWith('.onrender.com')) {
-    const siblingByToken = hostname
-      .replace('-frontend', '-api')
-      .replace('frontend', 'api');
-
-    return `${protocol}//${siblingByToken}/api`;
+    return `${protocol}//employee-registry-api.onrender.com/api`;
   }
 
+  // Generic fallback when frontend and backend are served behind same host/reverse-proxy.
   return `${origin}/api`;
 };
 
-const buildApiCandidates = () => {
-  const { protocol, hostname, origin } = window.location;
-  const configured = import.meta.env.VITE_API_URL?.trim();
-  const stored = getStoredApiBaseUrl();
-
-  const candidates = [configured, stored, `${origin}/api`];
-
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    candidates.push('http://localhost:5140/api');
-  }
-
-  if (hostname.endsWith('.onrender.com')) {
-    const siblingByToken = hostname
-      .replace('-frontend', '-api')
-      .replace('frontend', 'api');
-
-    candidates.push(`${protocol}//${siblingByToken}/api`);
-    candidates.push(`${protocol}//employee-registry-api.onrender.com/api`);
-  }
-
-  return [...new Set(candidates.filter(Boolean))];
-};
+const API_BASE_URL = inferApiBaseUrl();
 
 const client = axios.create({
   baseURL: inferApiBaseUrl(),
