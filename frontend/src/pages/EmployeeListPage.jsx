@@ -86,6 +86,12 @@ const EmployeeListPage = () => {
         page: overrides.page ?? pagination.current,
         pageSize: overrides.pageSize ?? pagination.pageSize,
         ...currentFilters,
+        search,
+        department,
+        minSalary: salaryRange.min,
+        maxSalary: salaryRange.max,
+        sortBy: sorter.sortBy,
+        sortDirection: sorter.sortDirection,
       };
 
       const response = await client.get('/employees', { params });
@@ -114,6 +120,22 @@ const EmployeeListPage = () => {
     }
   }, []);
 
+  }, [pagination, search, department, salaryRange.min, salaryRange.max, sorter.sortBy, sorter.sortDirection]);
+
+  const fetchSummary = useCallback(async () => {
+    try {
+      const response = await client.get('/employees/summary');
+      setSummary(response.data);
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEmployees({ page: 1 });
+    fetchSummary();
+  }, [department, salaryRange.min, salaryRange.max, sorter.sortBy, sorter.sortDirection, fetchEmployees, fetchSummary]);
+
   const debouncedSearch = useMemo(
     () => debounce((value) => {
       setPagination(prev => ({ ...prev, current: 1 }));
@@ -129,6 +151,7 @@ const EmployeeListPage = () => {
   useEffect(() => {
     fetchDashboard();
   }, [fetchDashboard]);
+  }, [search, fetchEmployees]);
 
   useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch]);
 
@@ -138,6 +161,7 @@ const EmployeeListPage = () => {
       message.success('Employee deleted');
       fetchEmployees();
       fetchDashboard();
+      fetchSummary();
     } catch (error) {
       console.error(error);
       message.error('Failed to delete employee');
@@ -260,6 +284,23 @@ const EmployeeListPage = () => {
     { title: 'NID', dataIndex: 'nid', key: 'nid' },
     { title: 'Department', dataIndex: 'department', key: 'department', render: (tag) => <Tag color="blue">{tag}</Tag> },
     { title: 'Salary', dataIndex: 'basicSalary', key: 'basicSalary', render: (salary) => `৳ ${Number(salary).toLocaleString()}` },
+    {
+      title: 'NID',
+      dataIndex: 'nid',
+      key: 'nid',
+    },
+    {
+      title: 'Department',
+      dataIndex: 'department',
+      key: 'department',
+      render: (tag) => <Tag color="blue">{tag}</Tag>,
+    },
+    {
+      title: 'Salary',
+      dataIndex: 'basicSalary',
+      key: 'basicSalary',
+      render: (salary) => `৳ ${Number(salary).toLocaleString()}`,
+    },
     {
       title: 'Action',
       key: 'action',
@@ -428,6 +469,122 @@ const EmployeeListPage = () => {
           </Card>
         </Col>
       </Row>
+    <div style={{ maxWidth: 1300, margin: '0 auto' }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card bordered={false}><Statistic title="Total Employees" value={summary.totalEmployees} prefix={<TeamOutlined style={{ color: '#6366f1' }} />} /></Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card bordered={false}><Statistic title="Departments" value={summary.totalDepartments} prefix={<BankOutlined style={{ color: '#10b981' }} />} /></Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card bordered={false}><Statistic title="Average Salary" value={summary.averageSalary} prefix={<WalletOutlined style={{ color: '#f59e0b' }} />} suffix="৳" precision={2} /></Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card bordered={false}><Statistic title="Top Department" value={summary.topDepartment} /></Card>
+        </Col>
+      </Row>
+
+      <Card
+        bordered={false}
+        title={<Title level={3} style={{ margin: 0 }}>Employee Directory</Title>}
+        extra={(
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={() => { fetchEmployees(); fetchSummary(); }}>Refresh</Button>
+            <Button icon={<FilePdfOutlined />} onClick={downloadReport}>Export PDF</Button>
+            {user?.role === 'Admin' && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/employees/new')}>
+                Add Employee
+              </Button>
+            )}
+          </Space>
+        )}
+      >
+        <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
+          <Col xs={24} md={10}>
+            <Input
+              placeholder="Search by name, NID or department..."
+              prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+              onChange={(e) => debouncedSearch(e.target.value)}
+              size="large"
+            />
+          </Col>
+          <Col xs={24} md={5}>
+            <Select
+              allowClear
+              size="large"
+              placeholder="Department"
+              style={{ width: '100%' }}
+              value={department}
+              onChange={setDepartment}
+              options={[
+                { label: 'IT', value: 'IT' },
+                { label: 'HR', value: 'HR' },
+                { label: 'Finance', value: 'Finance' },
+                { label: 'Marketing', value: 'Marketing' },
+                { label: 'Sales', value: 'Sales' },
+                { label: 'Operations', value: 'Operations' },
+                { label: 'Admin', value: 'Admin' },
+              ]}
+            />
+          </Col>
+          <Col xs={12} md={3}>
+            <InputNumber
+              size="large"
+              min={0}
+              style={{ width: '100%' }}
+              value={salaryRange.min}
+              onChange={(value) => setSalaryRange(prev => ({ ...prev, min: value ?? undefined }))}
+              placeholder="Min ৳"
+            />
+          </Col>
+          <Col xs={12} md={3}>
+            <InputNumber
+              size="large"
+              min={0}
+              style={{ width: '100%' }}
+              value={salaryRange.max}
+              onChange={(value) => setSalaryRange(prev => ({ ...prev, max: value ?? undefined }))}
+              placeholder="Max ৳"
+            />
+          </Col>
+          <Col xs={24} md={3}>
+            <Select
+              size="large"
+              style={{ width: '100%' }}
+              value={`${sorter.sortBy}:${sorter.sortDirection}`}
+              onChange={(value) => {
+                const [sortBy, sortDirection] = value.split(':');
+                setSorter({ sortBy, sortDirection });
+              }}
+              options={[
+                { label: 'Name (A-Z)', value: 'name:asc' },
+                { label: 'Name (Z-A)', value: 'name:desc' },
+                { label: 'Salary (Low-High)', value: 'salary:asc' },
+                { label: 'Salary (High-Low)', value: 'salary:desc' },
+              ]}
+            />
+          </Col>
+        </Row>
+
+        <Table
+          columns={columns}
+          dataSource={employees}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            pageSizeOptions: ['8', '12', '20', '50'],
+          }}
+          onChange={(nextPagination) => {
+            setPagination(prev => ({ ...prev, current: nextPagination.current, pageSize: nextPagination.pageSize }));
+            fetchEmployees({ page: nextPagination.current, pageSize: nextPagination.pageSize });
+          }}
+        />
+      </Card>
     </div>
   );
 };
