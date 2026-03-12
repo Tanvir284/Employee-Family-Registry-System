@@ -9,7 +9,8 @@ export const AuthProvider = ({ children }) => {
   });
 
   const login = async (username, password) => {
-    const response = await client.post('/auth/login', { username, password });
+    const normalizedUsername = username?.trim();
+    const response = await client.post('/auth/login', { username: normalizedUsername, password });
     const { token, role, username: userName } = response.data;
 
     localStorage.setItem('token', token);

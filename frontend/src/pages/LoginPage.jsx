@@ -19,7 +19,13 @@ const LoginPage = () => {
       navigate('/');
     } catch (error) {
       console.error(error);
-      message.error('Invalid username or password');
+      const apiMessage = error?.response?.data?.message;
+      const networkError = !error?.response;
+      if (networkError) {
+        message.error('Cannot reach server. Please check backend URL/deployment.');
+      } else {
+        message.error(apiMessage || 'Invalid username/email or password');
+      }
     } finally {
       setLoading(false);
     }
@@ -77,7 +83,7 @@ const LoginPage = () => {
           >
             <Input 
               prefix={<UserOutlined style={{ color: '#94a3b8' }} />} 
-              placeholder="Username" 
+              placeholder="Username or Email" 
               style={{ borderRadius: '12px', height: '48px' }}
             />
           </Form.Item>
