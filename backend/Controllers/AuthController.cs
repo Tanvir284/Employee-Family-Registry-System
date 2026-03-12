@@ -26,6 +26,13 @@ namespace EmployeeRegistry.Controllers
             return Ok(result);
         }
 
+
+        [HttpGet("health")]
+        public IActionResult Health()
+        {
+            return Ok(new { status = "ok" });
+        }
+
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto registerDto)
         {
