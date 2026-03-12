@@ -2,20 +2,16 @@ services:
   - type: web
     name: employee-registry-api
     env: docker
-    dockerContext: backend
-    dockerfilePath: backend/Dockerfile
+    dockerContext: .
+    dockerfilePath: Dockerfile
     plan: free
     envVars:
       - key: ConnectionStrings__DefaultConnection
-        fromDatabase:
-          name: employee-registry-db
-          property: connectionString
+        value: Host=dpg-d6pbril6ubrc73dpre40-a.singapore-postgres.render.com;Port=5432;Database=employee_registry_db_3ad7;Username=employee_registry_db_3ad7_user;Password=e8gdgiNNXMy4IL7M8aH0YLyvQpaF6ZZn;SSL Mode=Require;Trust Server Certificate=true
       - key: Jwt__Secret
         generateValue: true
-      - key: PORT
-        value: 8080
       - key: AllowedOrigins
-        value: "*" # Will update this after Vercel deployment
+        value: "*"
 
 databases:
   - name: employee-registry-db
