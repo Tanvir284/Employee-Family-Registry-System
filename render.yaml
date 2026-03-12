@@ -2,17 +2,29 @@ services:
   - type: web
     name: employee-registry-api
     env: docker
-    dockerContext: .
-    dockerfilePath: Dockerfile
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
     plan: free
     envVars:
       - key: ConnectionStrings__DefaultConnection
-        value: Host=dpg-d6pbril6ubrc73dpre40-a.singapore-postgres.render.com;Port=5432;Database=employee_registry_db_3ad7;Username=employee_registry_db_3ad7_user;Password=e8gdgiNNXMy4IL7M8aH0YLyvQpaF6ZZn;SSL Mode=Require;Trust Server Certificate=true
+        sync: false
       - key: Jwt__Secret
         generateValue: true
       - key: AllowedOrigins
         value: "*"
 
-databases:
-  - name: employee-registry-db
-    plan: free
+  - type: web
+    name: employee-registry-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: true
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
