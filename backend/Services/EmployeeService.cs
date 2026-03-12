@@ -9,6 +9,7 @@ namespace EmployeeRegistry.Services
         Task<IEnumerable<EmployeeDto>> GetAllEmployeesAsync(string? search);
         Task<PagedResultDto<EmployeeDto>> GetEmployeesAsync(EmployeeQueryDto query);
         Task<EmployeeSummaryDto> GetSummaryAsync();
+        Task<EmployeeDashboardDto> GetDashboardAsync();
         Task<EmployeeDto?> GetEmployeeByIdAsync(int id);
         Task<EmployeeDto> CreateEmployeeAsync(CreateEmployeeDto createDto);
         Task<bool> UpdateEmployeeAsync(int id, CreateEmployeeDto updateDto);
@@ -47,6 +48,11 @@ namespace EmployeeRegistry.Services
         public async Task<EmployeeSummaryDto> GetSummaryAsync()
         {
             return await _repository.GetSummaryAsync();
+        }
+
+        public async Task<EmployeeDashboardDto> GetDashboardAsync()
+        {
+            return await _repository.GetDashboardAsync();
         }
 
         public async Task<EmployeeDto?> GetEmployeeByIdAsync(int id)

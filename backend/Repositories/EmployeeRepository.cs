@@ -9,6 +9,7 @@ namespace EmployeeRegistry.Repositories
         Task<IEnumerable<Employee>> GetAllAsync(string? search);
         Task<PagedResultDto<Employee>> GetPagedAsync(EmployeeQueryDto query);
         Task<EmployeeSummaryDto> GetSummaryAsync();
+        Task<EmployeeDashboardDto> GetDashboardAsync();
         Task<Employee?> GetByIdAsync(int id);
         Task AddAsync(Employee employee);
         Task UpdateAsync(Employee employee);
@@ -73,6 +74,53 @@ namespace EmployeeRegistry.Repositories
                 TotalDepartments = totalDepartments,
                 AverageSalary = Math.Round(averageSalary, 2),
                 TopDepartment = topDepartment ?? "N/A"
+            };
+        }
+
+
+        public async Task<EmployeeDashboardDto> GetDashboardAsync()
+        {
+            var summary = await GetSummaryAsync();
+            var totalMonthlyPayroll = await _context.Employees.Select(e => e.BasicSalary).DefaultIfEmpty(0).SumAsync();
+            var employeesWithSpouse = await _context.Employees.CountAsync(e => e.Spouse != null);
+            var totalChildren = await _context.Children.CountAsync();
+
+            var departmentInsights = await _context.Employees
+                .GroupBy(e => e.Department)
+                .Select(g => new DepartmentInsightDto
+                {
+                    Department = g.Key,
+                    EmployeeCount = g.Count(),
+                    AverageSalary = Math.Round(g.Average(x => x.BasicSalary), 2)
+                })
+                .OrderByDescending(x => x.EmployeeCount)
+                .ThenBy(x => x.Department)
+                .ToListAsync();
+
+            var availableDepartments = departmentInsights.Select(x => x.Department).ToList();
+
+            var topEmployees = await _context.Employees
+                .OrderByDescending(e => e.BasicSalary)
+                .ThenBy(e => e.Name)
+                .Take(5)
+                .Select(e => new TopEmployeeDto
+                {
+                    Id = e.Id,
+                    Name = e.Name,
+                    Department = e.Department,
+                    Salary = e.BasicSalary
+                })
+                .ToListAsync();
+
+            return new EmployeeDashboardDto
+            {
+                Summary = summary,
+                TotalMonthlyPayroll = Math.Round(totalMonthlyPayroll, 2),
+                EmployeesWithSpouse = employeesWithSpouse,
+                TotalChildren = totalChildren,
+                AvailableDepartments = availableDepartments,
+                DepartmentInsights = departmentInsights,
+                TopEmployees = topEmployees
             };
         }
 

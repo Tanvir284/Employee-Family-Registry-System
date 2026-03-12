@@ -28,4 +28,30 @@ namespace EmployeeRegistry.DTOs
         public decimal AverageSalary { get; set; }
         public string TopDepartment { get; set; } = "N/A";
     }
+
+    public class DepartmentInsightDto
+    {
+        public string Department { get; set; } = string.Empty;
+        public int EmployeeCount { get; set; }
+        public decimal AverageSalary { get; set; }
+    }
+
+    public class TopEmployeeDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Department { get; set; } = string.Empty;
+        public decimal Salary { get; set; }
+    }
+
+    public class EmployeeDashboardDto
+    {
+        public EmployeeSummaryDto Summary { get; set; } = new();
+        public decimal TotalMonthlyPayroll { get; set; }
+        public int EmployeesWithSpouse { get; set; }
+        public int TotalChildren { get; set; }
+        public IReadOnlyList<string> AvailableDepartments { get; set; } = Array.Empty<string>();
+        public IReadOnlyList<DepartmentInsightDto> DepartmentInsights { get; set; } = Array.Empty<DepartmentInsightDto>();
+        public IReadOnlyList<TopEmployeeDto> TopEmployees { get; set; } = Array.Empty<TopEmployeeDto>();
+    }
 }
