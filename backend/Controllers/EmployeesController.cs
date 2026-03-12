@@ -31,6 +31,14 @@ namespace EmployeeRegistry.Controllers
             return Ok(summary);
         }
 
+
+        [HttpGet("dashboard")]
+        public async Task<ActionResult<EmployeeDashboardDto>> GetDashboard()
+        {
+            var dashboard = await _employeeService.GetDashboardAsync();
+            return Ok(dashboard);
+        }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<EmployeeDto>> GetById(int id)
         {

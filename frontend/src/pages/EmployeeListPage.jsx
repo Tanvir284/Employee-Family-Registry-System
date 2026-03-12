@@ -14,6 +14,8 @@ import {
   Statistic,
   Select,
   InputNumber,
+  List,
+  Tooltip,
 } from 'antd';
 import {
   SearchOutlined,
@@ -27,6 +29,11 @@ import {
   WalletOutlined,
   UserOutlined,
   ReloadOutlined,
+  DownloadOutlined,
+  SaveOutlined,
+  ClearOutlined,
+  TrophyOutlined,
+  HeartOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
@@ -34,19 +41,43 @@ import { useAuth } from '../contexts/useAuth';
 import { debounce } from 'lodash';
 
 const { Title, Text } = Typography;
+const FILTER_PRESETS_KEY = 'employeeFilterPresets';
 
 const EmployeeListPage = () => {
   const [employees, setEmployees] = useState([]);
-  const [summary, setSummary] = useState({ totalEmployees: 0, totalDepartments: 0, averageSalary: 0, topDepartment: 'N/A' });
+  const [dashboard, setDashboard] = useState({
+    summary: { totalEmployees: 0, totalDepartments: 0, averageSalary: 0, topDepartment: 'N/A' },
+    totalMonthlyPayroll: 0,
+    employeesWithSpouse: 0,
+    totalChildren: 0,
+    availableDepartments: [],
+    departmentInsights: [],
+    topEmployees: [],
+  });
+
   const [loading, setLoading] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState(undefined);
   const [salaryRange, setSalaryRange] = useState({ min: undefined, max: undefined });
   const [sorter, setSorter] = useState({ sortBy: 'name', sortDirection: 'asc' });
   const [pagination, setPagination] = useState({ current: 1, pageSize: 8, total: 0 });
+  const [filterPresets, setFilterPresets] = useState(() => {
+    const raw = localStorage.getItem(FILTER_PRESETS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  });
 
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const currentFilters = useMemo(() => ({
+    search,
+    department,
+    minSalary: salaryRange.min,
+    maxSalary: salaryRange.max,
+    sortBy: sorter.sortBy,
+    sortDirection: sorter.sortDirection,
+  }), [search, department, salaryRange.min, salaryRange.max, sorter.sortBy, sorter.sortDirection]);
 
   const fetchEmployees = useCallback(async (overrides = {}) => {
     setLoading(true);
@@ -54,12 +85,7 @@ const EmployeeListPage = () => {
       const params = {
         page: overrides.page ?? pagination.current,
         pageSize: overrides.pageSize ?? pagination.pageSize,
-        search,
-        department,
-        minSalary: salaryRange.min,
-        maxSalary: salaryRange.max,
-        sortBy: sorter.sortBy,
-        sortDirection: sorter.sortDirection,
+        ...currentFilters,
       };
 
       const response = await client.get('/employees', { params });
@@ -76,21 +102,17 @@ const EmployeeListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination, search, department, salaryRange.min, salaryRange.max, sorter.sortBy, sorter.sortDirection]);
+  }, [pagination, currentFilters]);
 
-  const fetchSummary = useCallback(async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
-      const response = await client.get('/employees/summary');
-      setSummary(response.data);
+      const response = await client.get('/employees/dashboard');
+      setDashboard(response.data);
     } catch (error) {
       console.error(error);
+      message.error('Failed to load dashboard analytics');
     }
   }, []);
-
-  useEffect(() => {
-    fetchEmployees({ page: 1 });
-    fetchSummary();
-  }, [department, salaryRange.min, salaryRange.max, sorter.sortBy, sorter.sortDirection, fetchEmployees, fetchSummary]);
 
   const debouncedSearch = useMemo(
     () => debounce((value) => {
@@ -102,7 +124,11 @@ const EmployeeListPage = () => {
 
   useEffect(() => {
     fetchEmployees({ page: 1 });
-  }, [search, fetchEmployees]);
+  }, [currentFilters, fetchEmployees]);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch]);
 
@@ -111,7 +137,7 @@ const EmployeeListPage = () => {
       await client.delete(`/employees/${id}`);
       message.success('Employee deleted');
       fetchEmployees();
-      fetchSummary();
+      fetchDashboard();
     } catch (error) {
       console.error(error);
       message.error('Failed to delete employee');
@@ -138,6 +164,85 @@ const EmployeeListPage = () => {
     }
   };
 
+  const exportCsv = async () => {
+    try {
+      const response = await client.get('/employees', {
+        params: {
+          ...currentFilters,
+          page: 1,
+          pageSize: 1000,
+        },
+      });
+
+      const rows = response.data.items ?? [];
+      const header = ['Name', 'NID', 'Department', 'Phone Number', 'Basic Salary'];
+      const csvRows = rows.map((row) => [
+        row.name,
+        row.nid,
+        row.department,
+        row.phoneNumber,
+        row.basicSalary,
+      ]);
+
+      const content = [header, ...csvRows]
+        .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `employees_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      message.error('CSV export failed');
+    }
+  };
+
+  const resetFilters = () => {
+    setSearch('');
+    setSearchInput('');
+    setDepartment(undefined);
+    setSalaryRange({ min: undefined, max: undefined });
+    setSorter({ sortBy: 'name', sortDirection: 'asc' });
+    setPagination(prev => ({ ...prev, current: 1 }));
+  };
+
+  const saveCurrentPreset = () => {
+    const name = window.prompt('Preset name? (e.g. High Salary IT)');
+    if (!name) return;
+
+    const next = [
+      { name, filters: currentFilters },
+      ...filterPresets.filter((preset) => preset.name !== name),
+    ].slice(0, 6);
+
+    setFilterPresets(next);
+    localStorage.setItem(FILTER_PRESETS_KEY, JSON.stringify(next));
+    message.success('Filter preset saved');
+  };
+
+  const applyPreset = (preset) => {
+    setSearchInput(preset.filters.search ?? '');
+    setSearch(preset.filters.search ?? '');
+    setDepartment(preset.filters.department ?? undefined);
+    setSalaryRange({
+      min: preset.filters.minSalary ?? undefined,
+      max: preset.filters.maxSalary ?? undefined,
+    });
+    setSorter({
+      sortBy: preset.filters.sortBy ?? 'name',
+      sortDirection: preset.filters.sortDirection ?? 'asc',
+    });
+    setPagination(prev => ({ ...prev, current: 1 }));
+  };
+
+  const departmentOptions = dashboard.availableDepartments.map((item) => ({ label: item, value: item }));
+
   const columns = [
     {
       title: 'Name',
@@ -152,23 +257,9 @@ const EmployeeListPage = () => {
         </Space>
       ),
     },
-    {
-      title: 'NID',
-      dataIndex: 'nid',
-      key: 'nid',
-    },
-    {
-      title: 'Department',
-      dataIndex: 'department',
-      key: 'department',
-      render: (tag) => <Tag color="blue">{tag}</Tag>,
-    },
-    {
-      title: 'Salary',
-      dataIndex: 'basicSalary',
-      key: 'basicSalary',
-      render: (salary) => `৳ ${Number(salary).toLocaleString()}`,
-    },
+    { title: 'NID', dataIndex: 'nid', key: 'nid' },
+    { title: 'Department', dataIndex: 'department', key: 'department', render: (tag) => <Tag color="blue">{tag}</Tag> },
+    { title: 'Salary', dataIndex: 'basicSalary', key: 'basicSalary', render: (salary) => `৳ ${Number(salary).toLocaleString()}` },
     {
       title: 'Action',
       key: 'action',
@@ -189,122 +280,154 @@ const EmployeeListPage = () => {
   ];
 
   return (
-    <div style={{ maxWidth: 1300, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false}><Statistic title="Total Employees" value={summary.totalEmployees} prefix={<TeamOutlined style={{ color: '#6366f1' }} />} /></Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false}><Statistic title="Departments" value={summary.totalDepartments} prefix={<BankOutlined style={{ color: '#10b981' }} />} /></Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false}><Statistic title="Average Salary" value={summary.averageSalary} prefix={<WalletOutlined style={{ color: '#f59e0b' }} />} suffix="৳" precision={2} /></Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false}><Statistic title="Top Department" value={summary.topDepartment} /></Card>
-        </Col>
+        <Col xs={24} sm={12} lg={6}><Card bordered={false}><Statistic title="Total Employees" value={dashboard.summary.totalEmployees} prefix={<TeamOutlined style={{ color: '#6366f1' }} />} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card bordered={false}><Statistic title="Departments" value={dashboard.summary.totalDepartments} prefix={<BankOutlined style={{ color: '#10b981' }} />} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card bordered={false}><Statistic title="Average Salary" value={dashboard.summary.averageSalary} prefix={<WalletOutlined style={{ color: '#f59e0b' }} />} suffix="৳" precision={2} /></Card></Col>
+        <Col xs={24} sm={12} lg={6}><Card bordered={false}><Statistic title="Monthly Payroll" value={dashboard.totalMonthlyPayroll} precision={2} prefix="৳" /></Card></Col>
       </Row>
 
-      <Card
-        bordered={false}
-        title={<Title level={3} style={{ margin: 0 }}>Employee Directory</Title>}
-        extra={(
-          <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => { fetchEmployees(); fetchSummary(); }}>Refresh</Button>
-            <Button icon={<FilePdfOutlined />} onClick={downloadReport}>Export PDF</Button>
-            {user?.role === 'Admin' && (
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/employees/new')}>
-                Add Employee
-              </Button>
-            )}
-          </Space>
-        )}
-      >
-        <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
-          <Col xs={24} md={10}>
-            <Input
-              placeholder="Search by name, NID or department..."
-              prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-              onChange={(e) => debouncedSearch(e.target.value)}
-              size="large"
-            />
-          </Col>
-          <Col xs={24} md={5}>
-            <Select
-              allowClear
-              size="large"
-              placeholder="Department"
-              style={{ width: '100%' }}
-              value={department}
-              onChange={setDepartment}
-              options={[
-                { label: 'IT', value: 'IT' },
-                { label: 'HR', value: 'HR' },
-                { label: 'Finance', value: 'Finance' },
-                { label: 'Marketing', value: 'Marketing' },
-                { label: 'Sales', value: 'Sales' },
-                { label: 'Operations', value: 'Operations' },
-                { label: 'Admin', value: 'Admin' },
-              ]}
-            />
-          </Col>
-          <Col xs={12} md={3}>
-            <InputNumber
-              size="large"
-              min={0}
-              style={{ width: '100%' }}
-              value={salaryRange.min}
-              onChange={(value) => setSalaryRange(prev => ({ ...prev, min: value ?? undefined }))}
-              placeholder="Min ৳"
-            />
-          </Col>
-          <Col xs={12} md={3}>
-            <InputNumber
-              size="large"
-              min={0}
-              style={{ width: '100%' }}
-              value={salaryRange.max}
-              onChange={(value) => setSalaryRange(prev => ({ ...prev, max: value ?? undefined }))}
-              placeholder="Max ৳"
-            />
-          </Col>
-          <Col xs={24} md={3}>
-            <Select
-              size="large"
-              style={{ width: '100%' }}
-              value={`${sorter.sortBy}:${sorter.sortDirection}`}
-              onChange={(value) => {
-                const [sortBy, sortDirection] = value.split(':');
-                setSorter({ sortBy, sortDirection });
-              }}
-              options={[
-                { label: 'Name (A-Z)', value: 'name:asc' },
-                { label: 'Name (Z-A)', value: 'name:desc' },
-                { label: 'Salary (Low-High)', value: 'salary:asc' },
-                { label: 'Salary (High-Low)', value: 'salary:desc' },
-              ]}
-            />
-          </Col>
-        </Row>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} md={12} lg={8}><Card bordered={false}><Statistic title="Employees with Spouse" value={dashboard.employeesWithSpouse} prefix={<HeartOutlined style={{ color: '#ec4899' }} />} /></Card></Col>
+        <Col xs={24} md={12} lg={8}><Card bordered={false}><Statistic title="Total Registered Children" value={dashboard.totalChildren} prefix={<TeamOutlined style={{ color: '#6366f1' }} />} /></Card></Col>
+        <Col xs={24} md={24} lg={8}><Card bordered={false}><Statistic title="Top Department" value={dashboard.summary.topDepartment} prefix={<TrophyOutlined style={{ color: '#f59e0b' }} />} /></Card></Col>
+      </Row>
 
-        <Table
-          columns={columns}
-          dataSource={employees}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            showSizeChanger: true,
-            pageSizeOptions: ['8', '12', '20', '50'],
-          }}
-          onChange={(nextPagination) => {
-            setPagination(prev => ({ ...prev, current: nextPagination.current, pageSize: nextPagination.pageSize }));
-            fetchEmployees({ page: nextPagination.current, pageSize: nextPagination.pageSize });
-          }}
-        />
-      </Card>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} xl={16}>
+          <Card
+            bordered={false}
+            title={<Title level={3} style={{ margin: 0 }}>Employee Directory</Title>}
+            extra={(
+              <Space wrap>
+                <Button icon={<ReloadOutlined />} onClick={() => { fetchEmployees(); fetchDashboard(); }}>Refresh</Button>
+                <Button icon={<SaveOutlined />} onClick={saveCurrentPreset}>Save Filter</Button>
+                <Button icon={<DownloadOutlined />} onClick={exportCsv}>CSV</Button>
+                <Button icon={<FilePdfOutlined />} onClick={downloadReport}>PDF</Button>
+                {user?.role === 'Admin' && <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/employees/new')}>Add Employee</Button>}
+              </Space>
+            )}
+          >
+            <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
+              <Col xs={24} md={9}>
+                <Input
+                  placeholder="Search by name, NID or department..."
+                  prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+                  value={searchInput}
+                  onChange={(e) => {
+                    setSearchInput(e.target.value);
+                    debouncedSearch(e.target.value);
+                  }}
+                  size="large"
+                />
+              </Col>
+              <Col xs={24} md={5}><Select allowClear size="large" placeholder="Department" style={{ width: '100%' }} value={department} onChange={setDepartment} options={departmentOptions} /></Col>
+              <Col xs={12} md={3}><InputNumber size="large" min={0} style={{ width: '100%' }} value={salaryRange.min} onChange={(value) => setSalaryRange(prev => ({ ...prev, min: value ?? undefined }))} placeholder="Min ৳" /></Col>
+              <Col xs={12} md={3}><InputNumber size="large" min={0} style={{ width: '100%' }} value={salaryRange.max} onChange={(value) => setSalaryRange(prev => ({ ...prev, max: value ?? undefined }))} placeholder="Max ৳" /></Col>
+              <Col xs={18} md={3}>
+                <Select
+                  size="large"
+                  style={{ width: '100%' }}
+                  value={`${sorter.sortBy}:${sorter.sortDirection}`}
+                  onChange={(value) => {
+                    const [sortBy, sortDirection] = value.split(':');
+                    setSorter({ sortBy, sortDirection });
+                  }}
+                  options={[
+                    { label: 'Name (A-Z)', value: 'name:asc' },
+                    { label: 'Name (Z-A)', value: 'name:desc' },
+                    { label: 'Salary ↑', value: 'salary:asc' },
+                    { label: 'Salary ↓', value: 'salary:desc' },
+                    { label: 'Dept (A-Z)', value: 'department:asc' },
+                  ]}
+                />
+              </Col>
+              <Col xs={6} md={1}>
+                <Tooltip title="Reset filters">
+                  <Button size="large" icon={<ClearOutlined />} onClick={resetFilters} />
+                </Tooltip>
+              </Col>
+            </Row>
+
+            <Table
+              columns={columns}
+              dataSource={employees}
+              rowKey="id"
+              loading={loading}
+              pagination={{
+                current: pagination.current,
+                pageSize: pagination.pageSize,
+                total: pagination.total,
+                showSizeChanger: true,
+                pageSizeOptions: ['8', '12', '20', '50'],
+              }}
+              onChange={(nextPagination) => {
+                setPagination(prev => ({ ...prev, current: nextPagination.current, pageSize: nextPagination.pageSize }));
+                fetchEmployees({ page: nextPagination.current, pageSize: nextPagination.pageSize });
+              }}
+            />
+          </Card>
+        </Col>
+
+        <Col xs={24} xl={8}>
+          <Card bordered={false} title="Saved Filter Presets" style={{ marginBottom: 16 }}>
+            <List
+              size="small"
+              locale={{ emptyText: 'No presets yet. Save one for fast reuse.' }}
+              dataSource={filterPresets}
+              renderItem={(preset) => (
+                <List.Item
+                  actions={[<Button key="apply" size="small" onClick={() => applyPreset(preset)}>Apply</Button>]}
+                >
+                  <Text strong>{preset.name}</Text>
+                </List.Item>
+              )}
+            />
+          </Card>
+
+          <Card bordered={false} title="Department Insights" style={{ marginBottom: 16 }}>
+            <List
+              size="small"
+              dataSource={dashboard.departmentInsights}
+              locale={{ emptyText: 'No department analytics available.' }}
+              renderItem={(item) => (
+                <List.Item>
+                  <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                      <Text strong>{item.department}</Text>
+                      <Tag color="geekblue">{item.employeeCount} employees</Tag>
+                    </Space>
+                    <Text type="secondary">Avg Salary: ৳ {Number(item.averageSalary).toLocaleString()}</Text>
+                  </Space>
+                </List.Item>
+              )}
+            />
+          </Card>
+
+          <Card bordered={false} title="Top Paid Employees">
+            <List
+              size="small"
+              dataSource={dashboard.topEmployees}
+              locale={{ emptyText: 'No employee records found.' }}
+              renderItem={(item, index) => (
+                <List.Item>
+                  <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                    <Space>
+                      <Tag color={index === 0 ? 'gold' : 'default'}>{index + 1}</Tag>
+                      <div>
+                        <Text strong>{item.name}</Text>
+                        <div><Text type="secondary" style={{ fontSize: 12 }}>{item.department}</Text></div>
+                      </div>
+                    </Space>
+                    <Text strong>৳ {Number(item.salary).toLocaleString()}</Text>
+                  </Space>
+                </List.Item>
+              )}
+            />
+          </Card>
+        </Col>
+      </Row>
     </div>
   );
 };
